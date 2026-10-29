@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#101827">
+<title>Football Live 182</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1220;--panel:#141e30;--line:#26344a;--muted:#a8b5c9;--green:#35d07f;--blue:#5bbcff}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#101b2e,#080d16);color:#f5f7fb;font-family:system-ui,-apple-system,"Segoe UI",Tahoma,Arial,sans-serif}
+header{padding:24px 18px 18px;background:#111c2e;border-bottom:1px solid var(--line)}
+h1{margin:0;font-size:26px}header p{margin:8px 0 0;color:var(--muted);font-size:14px}
+.wrap{max-width:780px;margin:auto;padding:16px}
+.tabs{display:flex;gap:8px;margin-bottom:16px}.tab{flex:1;padding:13px 8px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:#fff;font-weight:700;font-size:15px}.tab.active{background:#174b3a;border-color:#2a9e6b}
+.info{padding:12px 14px;background:#12273a;border:1px solid #214563;border-radius:12px;color:#c9e6ff;font-size:13px;margin-bottom:14px}
+.section-title{display:flex;align-items:center;justify-content:space-between;margin:12px 2px}.section-title h2{font-size:18px;margin:0}.pill{font-size:12px;color:#07160e;background:var(--green);border-radius:99px;padding:4px 9px;font-weight:800}
+.match{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:14px;margin:10px 0;box-shadow:0 5px 18px #0002}
+.league{font-size:12px;color:var(--muted);margin-bottom:12px}.teams{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center}.team{font-weight:650;line-height:1.4}.team:last-child{text-align:left}.score{font-size:23px;font-weight:850;white-space:nowrap}.status{font-size:12px;color:var(--green);margin-top:9px}.time{font-size:13px;color:#d4deec;margin-top:9px}.empty,.error{padding:20px;text-align:center;background:var(--panel);border:1px solid var(--line);border-radius:14px;color:var(--muted);line-height:1.7}
+button.refresh{display:block;width:100%;padding:12px;margin:14px 0;border:1px solid #2b4561;border-radius:12px;background:#1a2d45;color:#fff;font-weight:700;font-size:15px}
+footer{text-align:center;padding:24px 12px;color:var(--muted);font-size:12px}footer a{color:#8dccff}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<header><h1>⚽ Football Live 182</h1><p>نتائج المباريات وجدول اليوم والمباريات القادمة</p></header>
+<main class="wrap">
+<div class="tabs"><button class="tab active" id="liveTab" onclick="showTab('live')">🔴 المباريات المباشرة</button><button class="tab" id="scheduleTab" onclick="showTab('schedule')">📅 جدول المباريات</button></div>
+<div class="info">البيانات تأتي من SportScore. قد يختلف توفر بعض الدوريات أو تحديث النتائج حسب المصدر.</div>
+<div id="liveView"><div class="section-title"><h2>المباريات المباشرة</h2><span class="pill">LIVE</span></div><div id="liveList" class="empty">جارٍ تحميل النتائج...</div></div>
+<div id="scheduleView" class="hidden"><div class="section-title"><h2>جدول المباريات</h2></div><div id="scheduleList" class="empty">جارٍ تحميل الجدول...</div></div>
+<button class="refresh" onclick="loadData()">↻ تحديث النتائج والجدول</button>
+</main>
+<footer>بيانات المباريات مقدمة من <a href="https://sportscore.com/ar/football/" target="_blank" rel="noopener">SportScore</a> · Powered by SportScore</footer>
+<script>
+const API='https://sportscore.com/api/v1/fixtures/';
+let activeTab='live';
+function showTab(tab){activeTab=tab;document.getElementById('liveView').classList.toggle('hidden',tab!=='live');document.getElementById('scheduleView').classList.toggle('hidden',tab!=='schedule');document.getElementById('liveTab').classList.toggle('active',tab==='live');document.getElementById('scheduleTab').classList.toggle('active',tab==='schedule')}
+function dateUTC(offset=0){const d=new Date();d.setUTCDate(d.getUTCDate()+offset);return d.toISOString().slice(0,10)}
+function getMatches(payload){if(Array.isArray(payload))return payload;for(const k of ['data','fixtures','matches','results'])if(Array.isArray(payload?.[k]))return payload[k];if(Array.isArray(payload?.data?.fixtures))return payload.data.fixtures;return []}
+function val(obj,keys,fallback=''){for(const k of keys){const v=k.split('.').reduce((o,p)=>o?.[p],obj);if(v!==undefined&&v!==null&&v!=='')return v}return fallback}
+function statusOf(m){return String(val(m,['status','status_text','state','fixture.status'], '')).toLowerCase()}
+function isLive(m){const s=statusOf(m);return ['live','inplay','in_play','1h','2h','ht','in progress','in_progress','playing'].some(x=>s.includes(x))||m?.is_live===true}
+function isUpcoming(m){const s=statusOf(m);return ['upcoming','scheduled','not started','not_started','ns','fixture'].some(x=>s.includes(x))||(!isLive(m)&&val(m,['home_score','score.home','home.score'],null)===null)}
+function teamName(m,side){return val(m,[side,side+'.name',side+'_team',side+'_name',side+'.team.name'],side==='home'?'الفريق الأول':'الفريق الثاني')}
+function score(m,side){return val(m,[side+'_score','score.'+side,side+'.score'],null)}
+function timeText(m){let t=val(m,['time','date','kickoff','start_time','fixture.date'],'');if(!t)return '';const d=new Date(t);if(isNaN(d))return String(t);return d.toLocaleString('ar-IQ',{timeZone:'Asia/Baghdad',weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}
+function card(m){const league=val(m,['competition.name','league.name','competition','league','tournament'],'كرة القدم');const h=teamName(m,'home'),a=teamName(m,'away');const hs=score(m,'home'),as=score(m,'away');const s=statusOf(m);const live=isLive(m);const scoreText=(hs!==null&&as!==null)?`${hs} - ${as}`:'—';return `<article class="match"><div class="league">${esc(league)}</div><div class="teams"><div class="team">${esc(h)}</div><div class="score">${esc(scoreText)}</div><div class="team">${esc(a)}</div></div><div class="${live?'status':'time'}">${live?'🔴 مباشر · ':''}${esc(val(m,['status_text','status','state'],'موعد المباراة'))}</div><div class="time">${esc(timeText(m))}</div></article>`}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+async function fetchDay(date){const u=API+'?sport=football&date='+encodeURIComponent(date)+'&limit=200';const r=await fetch(u);if(!r.ok)throw new Error('HTTP '+r.status);return getMatches(await r.json())}
+function showList(id,items,kind){const el=document.getElementById(id);if(!items.length){el.className='empty';el.innerHTML=kind==='live'?'لا توجد مباريات مباشرة ظاهرة الآن. جرّب تحديث الصفحة لاحقًا.':'لم تظهر مباريات في الجدول. جرّب التحديث أو تحقق من توفر المصدر.';return}el.className='';el.innerHTML=items.map(card).join('')}
+async function loadData(){const liveEl=document.getElementById('liveList'),schedEl=document.getElementById('scheduleList');liveEl.className='empty';liveEl.textContent='جارٍ تحميل النتائج...';schedEl.className='empty';schedEl.textContent='جارٍ تحميل الجدول...';try{const [today,tomorrow]=await Promise.all([fetchDay(dateUTC(0)),fetchDay(dateUTC(1))]);const all=[...today,...tomorrow];const unique=[...new Map(all.map((m,i)=>[val(m,['id','slug'],String(i)),m])).values()];showList('liveList',unique.filter(isLive),'live');showList('scheduleList',unique.filter(m=>!isLive(m)&&isUpcoming(m)).sort((a,b)=>new Date(val(a,['time','date','kickoff'],0))-new Date(val(b,['time','date','kickoff'],0))),'schedule')}catch(e){const msg='تعذر تحميل البيانات الآن. تأكد من الإنترنت ثم اضغط تحديث. قد يكون مصدر البيانات متوقفًا مؤقتًا.';for(const id of ['liveList','scheduleList']){const el=document.getElementById(id);el.className='error';el.textContent=msg}}}
+loadData();setInterval(loadData,60000);
+</script>
+</body>
